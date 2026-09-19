@@ -130,12 +130,9 @@ class PumpService : Service() {
                 val result: SmsResult = sendSms(this, task)
                 when (result) {
                     is SmsResult.Ok -> {
-                        AppLogger.log(if (Config.SIMULATE_SMS) "СИМУЛЯЦИЯ: #${task.id} отправлено — delivered"
-                                      else "SMS отправлено #${task.id} — delivered")
+                        AppLogger.log("SMS отправлено #${task.id} — delivered")
                         PumpState.setCurrentTask(
-                            PumpState.currentTask.value?.copy(
-                                stage = if (Config.SIMULATE_SMS) "Доставлено (симуляция)" else "Доставлено"
-                            )
+                            PumpState.currentTask.value?.copy(stage = "Доставлено")
                         )
                         try { api.markDelivered(task.id) } catch (e: Exception) {
                             AppLogger.log("markDelivered ошибка: ${e.message}")
@@ -162,13 +159,8 @@ class PumpService : Service() {
         }
     }
 
-    /** Отправка SMS: при SIMULATE_SMS — имитация с задержкой вместо реального SmsManager. */
+    /** Отправка SMS через системный SmsManager. */
     private suspend fun sendSms(context: Context, task: SmsOutbox): SmsResult {
-        if (Config.SIMULATE_SMS) {
-            AppLogger.log("СИМУЛЯЦИЯ #${task.id}: отправка SMS на ${task.phone}…")
-            delay(1_500) // имитация времени работы SmsManager
-            return SmsResult.Ok
-        }
         return SmsSender.send(context, task.phone, task.messageText)
     }
 

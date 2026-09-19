@@ -19,9 +19,6 @@ object Config {
     const val SMS_SENT_TIMEOUT_MS = 60_000L
     const val LOG_MAX = 30
 
-    /** true — реальные SMS не отправляются, вместо них имитация (задача всё равно помечается delivered). */
-    const val SIMULATE_SMS = true
-
     /** Приводит введённый адрес к виду, который требует Retrofit: непустой, с '/' в конце. */
     fun normalizeBaseUrl(raw: String?): String {
         val trimmed = raw?.trim().orEmpty()
