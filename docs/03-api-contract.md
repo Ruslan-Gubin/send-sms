@@ -34,12 +34,12 @@
 - Захват атомарный: статус → `in_work`, номер добавляется в `sender_phones`. TTL 5 мин от `updated_at` (протухшие удаляются).
 - Ошибки `failed*` остаются ретраябельными для других `sender_phone`.
 
-## 2) POST /sms/outbox/:id/delivered
+## 2) POST /sms/outbox-delivered/:id
 
 - Успех отправки SMS, переводит запись в `delivered` (если `status = in_work`).
-- Ответ — обновлённая запись или ошибка «Запись не найдена или уже обработана».
+- Ответ — `data: null`, `status: success`, или ошибка «Запись не найдена или уже обработана».
 
-## 3) POST /sms/outbox/:id/failed
+## 3) POST /sms/outbox-failed/:id
 
 - Тело:
   ```json

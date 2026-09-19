@@ -9,4 +9,7 @@ object Config {
     const val POLL_INTERVAL_MS = 10_000L
     const val SMS_SENT_TIMEOUT_MS = 60_000L
     const val LOG_MAX = 30
+
+    /** true — реальные SMS не отправляются, вместо них имитация (задача всё равно помечается delivered). */
+    const val SIMULATE_SMS = true
 }

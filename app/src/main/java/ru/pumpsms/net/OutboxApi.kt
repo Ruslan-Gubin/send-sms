@@ -35,10 +35,10 @@ interface OutboxService {
     @GET("sms/outbox")
     suspend fun getOutbox(@Query("sender_phone") senderPhone: String): ResponseData<SmsOutbox>
 
-    @POST("sms/outbox/{id}/delivered")
+    @POST("sms/outbox-delivered/{id}")
     suspend fun markDelivered(@Path("id") id: Int): ResponseData<SmsOutbox>
 
-    @POST("sms/outbox/{id}/failed")
+    @POST("sms/outbox-failed/{id}")
     suspend fun markFailed(@Path("id") id: Int, @Body body: MarkFailedBody): ResponseData<SmsOutbox>
 }
 

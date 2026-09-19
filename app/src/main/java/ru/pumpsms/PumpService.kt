@@ -14,6 +14,7 @@ import kotlinx.coroutines.*
 import ru.pumpsms.net.NetworkMonitor
 import ru.pumpsms.net.OutboxApi
 import ru.pumpsms.net.MarkFailedBody
+import ru.pumpsms.net.SmsOutbox
 import ru.pumpsms.sms.SmsResult
 import ru.pumpsms.sms.SmsSender
 import ru.pumpsms.util.AppLogger
@@ -55,6 +56,7 @@ class PumpService : Service() {
             ACTION_STOP -> {
                 AppLogger.log("Остановлен")
                 pumpJob?.cancel()
+                PumpState.reset()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 // флаг — был включён
@@ -74,6 +76,7 @@ class PumpService : Service() {
                     .apply()
                 startForeground(NOTIF_ID, buildNotification("Пульс активен · $senderPhone"))
                 pumpJob?.cancel()
+                PumpState.reset()
                 pumpJob = scope.launch { pumpLoop(senderPhone) }
                 AppLogger.log("Запущен · $senderPhone")
             }
@@ -87,6 +90,8 @@ class PumpService : Service() {
             try {
                 if (!NetworkMonitor.hasInternet(this)) {
                     AppLogger.log("Нет интернета — пропуск")
+                    PumpState.setServerConnected(false)
+                    PumpState.setCurrentTask(null)
                     delay(Config.POLL_INTERVAL_MS)
                     continue
                 }
@@ -95,9 +100,12 @@ class PumpService : Service() {
                     api.getOutbox(phone)
                 } catch (e: Exception) {
                     AppLogger.log("Ошибка опроса: ${e.message}")
+                    PumpState.setServerConnected(false)
+                    PumpState.setCurrentTask(null)
                     delay(Config.POLL_INTERVAL_MS)
                     continue
                 }
+                PumpState.setServerConnected(true)
                 if (resp.status != "success") {
                     AppLogger.log("Бекенд: ${resp.message}")
                     delay(Config.POLL_INTERVAL_MS)
@@ -106,22 +114,33 @@ class PumpService : Service() {
                 val task = resp.data
                 if (task == null) {
                     // нет задач — тихо, без спама лога каждую итерацию
+                    PumpState.setCurrentTask(null)
                     delay(Config.POLL_INTERVAL_MS)
                     continue
                 }
                 AppLogger.log("Взята задача #${task.id} → ${task.phone}")
                 updateNotification("Отправка #${task.id} → ${task.phone}")
+                PumpState.setCurrentTask(CurrentTask(task.id, task.phone, task.messageText, "Отправка…"))
 
-                val result: SmsResult = SmsSender.send(this, task.phone, task.messageText)
+                val result: SmsResult = sendSms(this, task)
                 when (result) {
                     is SmsResult.Ok -> {
-                        AppLogger.log("SMS отправлено #${task.id} — delivered")
+                        AppLogger.log(if (Config.SIMULATE_SMS) "СИМУЛЯЦИЯ: #${task.id} отправлено — delivered"
+                                      else "SMS отправлено #${task.id} — delivered")
+                        PumpState.setCurrentTask(
+                            PumpState.currentTask.value?.copy(
+                                stage = if (Config.SIMULATE_SMS) "Доставлено (симуляция)" else "Доставлено"
+                            )
+                        )
                         try { api.markDelivered(task.id) } catch (e: Exception) {
                             AppLogger.log("markDelivered ошибка: ${e.message}")
                         }
                     }
                     is SmsResult.Failed -> {
                         AppLogger.log("SMS ошибка #${task.id}: ${result.errorCode} — ${result.errorReason}")
+                        PumpState.setCurrentTask(
+                            PumpState.currentTask.value?.copy(stage = "Ошибка: ${result.errorReason}")
+                        )
                         try {
                             api.markFailed(task.id, MarkFailedBody(result.errorCode, result.errorReason))
                         } catch (e: Exception) {
@@ -136,6 +155,16 @@ class PumpService : Service() {
             }
             delay(Config.POLL_INTERVAL_MS)
         }
+    }
+
+    /** Отправка SMS: при SIMULATE_SMS — имитация с задержкой вместо реального SmsManager. */
+    private suspend fun sendSms(context: Context, task: SmsOutbox): SmsResult {
+        if (Config.SIMULATE_SMS) {
+            AppLogger.log("СИМУЛЯЦИЯ #${task.id}: отправка SMS на ${task.phone}…")
+            delay(1_500) // имитация времени работы SmsManager
+            return SmsResult.Ok
+        }
+        return SmsSender.send(context, task.phone, task.messageText)
     }
 
     private fun createChannel() {

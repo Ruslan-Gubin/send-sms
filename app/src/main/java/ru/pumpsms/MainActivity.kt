@@ -7,15 +7,22 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -52,6 +59,8 @@ class MainActivity : ComponentActivity() {
         var phone by remember { mutableStateOf(prefs.getString("senderPhone", "") ?: "") }
         var isRunning by remember { mutableStateOf(prefs.getBoolean("isRunning", false)) }
         val logs by AppLogger.logs.collectAsState()
+        val serverConnected by PumpState.serverConnected.collectAsState()
+        val currentTask by PumpState.currentTask.collectAsState()
 
         // синхронизируем с префами при изменениях из BootReceiver/сервиса
         LaunchedEffect(Unit) {
@@ -132,6 +141,48 @@ class MainActivity : ComponentActivity() {
 
                     Text(if (isRunning) ctx.getString(R.string.service_running) else ctx.getString(R.string.service_stopped),
                         color = if (isRunning) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+
+                    // Индикатор соединения с сервером
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val (connColor, connText) = when (serverConnected) {
+                            true -> Color(0xFF2E7D32) to "Сервер: подключён"
+                            false -> Color(0xFFC62828) to "Сервер: недоступен"
+                            null -> Color(0xFF9E9E9E) to "Сервер: —"
+                        }
+                        Box(Modifier.size(10.dp).clip(CircleShape).background(connColor))
+                        Text(connText, style = MaterialTheme.typography.bodySmall)
+                    }
+
+                    if (Config.SIMULATE_SMS) {
+                        Text("Режим симуляции: SMS не отправляются",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.tertiary)
+                    }
+
+                    // Текущая задача
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Текущая задача", style = MaterialTheme.typography.titleSmall)
+                            val t = currentTask
+                            if (t == null) {
+                                Text("Нет активной задачи",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            } else {
+                                Text("#${t.id} → ${t.phone}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold)
+                                Text(t.message,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(t.stage,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
 
                     Card(Modifier.fillMaxWidth().weight(1f), shape = RoundedCornerShape(12.dp)) {
                         Column(Modifier.fillMaxSize().padding(12.dp)) {

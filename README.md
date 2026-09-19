@@ -1,6 +1,6 @@
 # PumpSms — отправитель SMS для shop
 
-Личный Android-пумпер: каждые 10с забирает задачу с `GET /sms/outbox?sender_phone=...`, шлёт SMS, отчитывается `POST /sms/outbox/:id/{delivered,failed}`. Работает в фоне (экран потух) и после перезагрузки.
+Личный Android-пумпер: каждые 10с забирает задачу с `GET /sms/outbox?sender_phone=...`, шлёт SMS, отчитывается `POST /sms/outbox-delivered/:id` / `POST /sms/outbox-failed/:id`. Работает в фоне (экран потух) и после перезагрузки.
 
 ## Быстрый старт
 ```bash
