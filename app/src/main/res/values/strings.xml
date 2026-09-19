@@ -9,4 +9,6 @@
     <string name="btn_fill_my_number">Подставить мой номер</string>
     <string name="service_running">Пульс активен</string>
     <string name="service_stopped">Остановлен</string>
+    <string name="hint_base_url">Адрес бекенда (http://…)</string>
+    <string name="label_poll_interval">Интервал опроса</string>
 </resources>

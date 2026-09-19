@@ -58,6 +58,8 @@ class MainActivity : ComponentActivity() {
         val prefs = remember { ctx.getSharedPreferences("pump", MODE_PRIVATE) }
         var phone by remember { mutableStateOf(prefs.getString("senderPhone", "") ?: "") }
         var isRunning by remember { mutableStateOf(prefs.getBoolean("isRunning", false)) }
+        var baseUrl by remember { mutableStateOf(prefs.getString("baseUrl", Config.DEFAULT_BASE_URL) ?: Config.DEFAULT_BASE_URL) }
+        var pollIntervalMs by remember { mutableStateOf(prefs.getLong("pollIntervalMs", Config.DEFAULT_POLL_INTERVAL_MS)) }
         val logs by AppLogger.logs.collectAsState()
         val serverConnected by PumpState.serverConnected.collectAsState()
         val currentTask by PumpState.currentTask.collectAsState()
@@ -71,8 +73,8 @@ class MainActivity : ComponentActivity() {
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("PumpSms", style = MaterialTheme.typography.headlineSmall)
-                    Text("Бекенд: ${Config.BASE_URL}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Устройство шлёт SMS каждые 10с. Работает с потухшим экраном.", style = MaterialTheme.typography.bodySmall)
+                    Text("Бекенд: $baseUrl", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Устройство шлёт SMS каждые ${pollIntervalMs / 1_000}с. Работает с потухшим экраном.", style = MaterialTheme.typography.bodySmall)
 
                     OutlinedTextField(
                         value = phone,
@@ -102,6 +104,34 @@ class MainActivity : ComponentActivity() {
                         TextButton(onClick = { AppLogger.clear() }) { Text("Очистить лог") }
                     }
 
+                    OutlinedTextField(
+                        value = baseUrl,
+                        onValueChange = {
+                            baseUrl = it
+                            prefs.edit().putString("baseUrl", it).apply()
+                        },
+                        label = { Text(ctx.getString(R.string.hint_base_url)) },
+                        placeholder = { Text(Config.DEFAULT_BASE_URL) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Text(ctx.getString(R.string.label_poll_interval),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Config.POLL_INTERVAL_OPTIONS_MS.forEach { opt ->
+                            FilterChip(
+                                selected = opt == pollIntervalMs,
+                                onClick = {
+                                    pollIntervalMs = opt
+                                    prefs.edit().putLong("pollIntervalMs", opt).apply()
+                                },
+                                label = { Text("${opt / 1_000}с") }
+                            )
+                        }
+                    }
+
                     val digits = DeviceNumber.normalize(phone)
                     val valid = DeviceNumber.isValidDigits(digits)
                     if (phone.isNotEmpty() && !valid) {
@@ -117,8 +147,13 @@ class MainActivity : ComponentActivity() {
                                 if (perms.isNotEmpty()) permLauncher.launch(perms.toTypedArray())
 
                                 val normalized = DeviceNumber.normalize(phone)
-                                prefs.edit().putString("senderPhone", normalized).apply()
+                                val normalizedUrl = Config.normalizeBaseUrl(baseUrl)
+                                prefs.edit()
+                                    .putString("senderPhone", normalized)
+                                    .putString("baseUrl", normalizedUrl)
+                                    .apply()
                                 phone = normalized
+                                baseUrl = normalizedUrl
                                 PumpService.start(ctx, normalized)
                                 isRunning = true
                             },

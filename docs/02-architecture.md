@@ -39,7 +39,7 @@ PumpService (ForegroundService)
 Статус кодируется в `error_code` для бекенда (`docs/03-api-contract.md`).
 
 ## Конфигурация
-`Config.BASE_URL` — единственный источник адреса бекенда, меняется сборкой. Пока `http://192.168.x.x:4010` (локальный ПК в той же Wi-Fi). На устройстве должно работать `usesCleartextTraffic="true"` для HTTP.
+Адрес бекенда и интервал опроса задаются прямо в приложении (SharedPreferences `pump`: ключи `baseUrl`, `pollIntervalMs`), дефолты — `Config.DEFAULT_BASE_URL` / `Config.DEFAULT_POLL_INTERVAL_MS`. Применяются при старте сервиса в `PumpService.onStartCommand`, смена требует Stop → Start. На устройстве должно работать `usesCleartextTraffic="true"` для HTTP.
 
 ## Сборка
 - `minSdk 26`, `targetSdk 34`, `compileSdk 34`

@@ -70,29 +70,34 @@ class PumpService : Service() {
                     stopSelf()
                     return START_NOT_STICKY
                 }
-                getSharedPreferences("pump", MODE_PRIVATE).edit()
+                val prefs = getSharedPreferences("pump", MODE_PRIVATE)
+                val apiBaseUrl = Config.normalizeBaseUrl(prefs.getString("baseUrl", Config.DEFAULT_BASE_URL))
+                val pollIntervalMs = prefs.getLong("pollIntervalMs", Config.DEFAULT_POLL_INTERVAL_MS)
+                    .coerceIn(Config.POLL_INTERVAL_MIN_MS, Config.POLL_INTERVAL_MAX_MS)
+                prefs.edit()
+                    .putString("baseUrl", apiBaseUrl)
                     .putString("senderPhone", senderPhone)
                     .putBoolean("isRunning", true)
                     .apply()
                 startForeground(NOTIF_ID, buildNotification("Пульс активен · $senderPhone"))
                 pumpJob?.cancel()
                 PumpState.reset()
-                pumpJob = scope.launch { pumpLoop(senderPhone) }
-                AppLogger.log("Запущен · $senderPhone")
+                pumpJob = scope.launch { pumpLoop(senderPhone, apiBaseUrl, pollIntervalMs) }
+                AppLogger.log("Запущен · $senderPhone · $apiBaseUrl · опрос ${pollIntervalMs / 1_000}с")
             }
         }
         return START_STICKY
     }
 
-    private suspend fun pumpLoop(phone: String) {
-        val api = OutboxApi.create()
+    private suspend fun pumpLoop(phone: String, baseUrl: String, pollIntervalMs: Long) {
+        val api = OutboxApi.create(baseUrl)
         while (currentCoroutineContext().isActive) {
             try {
                 if (!NetworkMonitor.hasInternet(this)) {
                     AppLogger.log("Нет интернета — пропуск")
                     PumpState.setServerConnected(false)
                     PumpState.setCurrentTask(null)
-                    delay(Config.POLL_INTERVAL_MS)
+                    delay(pollIntervalMs)
                     continue
                 }
                 AppLogger.log("Опрос /sms/outbox…")
@@ -102,20 +107,20 @@ class PumpService : Service() {
                     AppLogger.log("Ошибка опроса: ${e.message}")
                     PumpState.setServerConnected(false)
                     PumpState.setCurrentTask(null)
-                    delay(Config.POLL_INTERVAL_MS)
+                    delay(pollIntervalMs)
                     continue
                 }
                 PumpState.setServerConnected(true)
                 if (resp.status != "success") {
                     AppLogger.log("Бекенд: ${resp.message}")
-                    delay(Config.POLL_INTERVAL_MS)
+                    delay(pollIntervalMs)
                     continue
                 }
                 val task = resp.data
                 if (task == null) {
                     // нет задач — тихо, без спама лога каждую итерацию
                     PumpState.setCurrentTask(null)
-                    delay(Config.POLL_INTERVAL_MS)
+                    delay(pollIntervalMs)
                     continue
                 }
                 AppLogger.log("Взята задача #${task.id} → ${task.phone}")
@@ -153,7 +158,7 @@ class PumpService : Service() {
             catch (e: Exception) {
                 AppLogger.log("Цикл ошибка: ${e.message}")
             }
-            delay(Config.POLL_INTERVAL_MS)
+            delay(pollIntervalMs)
         }
     }
 

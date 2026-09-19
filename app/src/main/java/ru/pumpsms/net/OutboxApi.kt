@@ -43,7 +43,7 @@ interface OutboxService {
 }
 
 object OutboxApi {
-    fun create(baseUrl: String = Config.BASE_URL): OutboxService {
+    fun create(baseUrl: String = Config.DEFAULT_BASE_URL): OutboxService {
         val client = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)

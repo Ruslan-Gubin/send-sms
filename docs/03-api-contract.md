@@ -59,5 +59,5 @@
 
 ## Замечания для клиента
 - `sender_phone` должен быть нормализован `replace(/\D/g, "")` (10–15 цифр). Если приходит из `TelephonyManager` с `+7`, убрать non-digits.
-- `BASE_URL` — `Config.BASE_URL`, локальный ПК (`192.168.x.x`) или деплой.
+- `BASE_URL` — вводится в приложении (поле «Адрес бекенда», дефолт `Config.DEFAULT_BASE_URL`): локальный ПК (`192.168.x.x`) или деплой.
 - Устройство не шлёт `device_id` (только `sender_phone`) — `device_id` используется лишь на `request-otp`.
